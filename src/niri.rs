@@ -41,25 +41,40 @@ impl Niri {
 
     /// Returns a stream of workspace changes.
     pub fn workspace_stream(&self) -> Result<impl Stream<Item = Vec<Workspace>> + use<>, Error> {
-        let mut socket = socket()?;
-        let reply = socket.send(Request::EventStream).map_err(Error::NiriIpc)?;
-        reply::typed!(Handled, reply)?;
+        let (tx, rx) = async_channel::unbounded();
 
-        let mut next = socket.read_events();
-        Ok(async_stream::stream! {
-            loop {
-                match next() {
-                    Ok(Event::WorkspacesChanged { workspaces }) => {
-                        yield workspaces;
-                    }
-                    Ok(_) => (),
-                    Err(e) => {
-                        tracing::error!(%e, "Niri IPC error reading from event stream");
-                    }
+        std::thread::spawn(move || {
+            if let Err(e) = workspace_stream_task(tx) {
+                tracing::error!(%e, "Niri taskbar workspace stream error");
+            }
+        });
+
+        Ok(rx)
+    }
+}
+
+fn workspace_stream_task(tx: async_channel::Sender<Vec<Workspace>>) -> Result<(), Error> {
+    let mut socket = socket()?;
+    let reply = socket.send(Request::EventStream).map_err(Error::NiriIpc)?;
+    reply::typed!(Handled, reply)?;
+
+    let mut next = socket.read_events();
+    loop {
+        match next() {
+            Ok(Event::WorkspacesChanged { workspaces }) => {
+                if tx.send_blocking(workspaces).is_err() {
+                    break;
                 }
             }
-        })
+            Ok(_) => (),
+            Err(e) => {
+                tracing::error!(%e, "Niri IPC error reading from event stream");
+                return Err(Error::NiriIpc(e));
+            }
+        }
     }
+
+    Ok(())
 }
 
 // Helper to marshal request errors into our own type system.

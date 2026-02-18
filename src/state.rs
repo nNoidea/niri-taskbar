@@ -51,18 +51,16 @@ impl State {
 
         glib::spawn_future_local(window_stream(tx.clone(), self.niri().window_stream()));
 
-        // We don't want to send a set of workspaces through until after the window stream has
-        // yielded a window snapshot, and it's easier to defer it here than in the calling code.
-        let mut delay = Some((tx, self.niri().workspace_stream()?));
+        // We'll spawn the workspace stream immediately. The original code deferred this until
+        // the first window snapshot, but that introduced a circular dependency bug where
+        // the stream would never start if the initial event wasn't a snapshot.
+        //
+        // It's safer to just start it now. If we get workspace info before windows, it just
+        // updates the filter which is harmless.
+        glib::spawn_future_local(workspace_stream(tx.clone(), self.niri().workspace_stream()?));
 
         Ok(async_stream::stream! {
             while let Ok(event) = rx.recv().await {
-                if let Some((tx, stream)) = delay.take() {
-                    if let &Event::Workspaces(_) = &event {
-                        glib::spawn_future_local(workspace_stream(tx, stream));
-                    }
-                }
-
                 yield event;
             }
         })
