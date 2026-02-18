@@ -68,6 +68,7 @@ impl Button {
         let icon_path = app_id
             .as_deref()
             .and_then(|id| state.icon_cache().lookup(id));
+        let icon_size = state.config().icon_size();
 
         let button = Self {
             app_id,
@@ -77,7 +78,7 @@ impl Button {
 
         // Set up our event handlers. It's easier to do this with self already available.
         button.connect_click_handler(window.id);
-        button.connect_size_allocate(icon_path);
+        button.connect_size_allocate(icon_path, icon_size);
 
         button
     }
@@ -143,7 +144,7 @@ impl Button {
     }
 
     #[tracing::instrument(level = "TRACE")]
-    fn connect_size_allocate(&self, icon_path: Option<PathBuf>) {
+    fn connect_size_allocate(&self, icon_path: Option<PathBuf>, icon_size: Option<i32>) {
         let last_size = RefCell::new(None);
 
         self.button
@@ -194,10 +195,22 @@ impl Button {
                     let margin = context.margin(StateFlags::NORMAL);
                     let padding = context.padding(StateFlags::NORMAL);
 
-                    let size = allocation.height()
-                        - border.vertical_size()
-                        - margin.vertical_size()
-                        - padding.vertical_size();
+                    let size = if let Some(icon_size) = icon_size {
+                        // Use the explicitly configured icon size.
+                        icon_size
+                    } else {
+                        // Use the smaller of width/height so icons fit in both
+                        // horizontal and vertical orientations.
+                        let available_height = allocation.height()
+                            - border.vertical_size()
+                            - margin.vertical_size()
+                            - padding.vertical_size();
+                        let available_width = allocation.width()
+                            - border.horizontal_size()
+                            - margin.horizontal_size()
+                            - padding.horizontal_size();
+                        available_height.min(available_width)
+                    };
 
                     // Now we know the size, we can actually load the image.
                     let image =
@@ -265,10 +278,15 @@ impl Button {
 
 trait BorderExt {
     fn vertical_size(&self) -> i32;
+    fn horizontal_size(&self) -> i32;
 }
 
 impl BorderExt for Border {
     fn vertical_size(&self) -> i32 {
         (self.top + self.bottom).into()
+    }
+
+    fn horizontal_size(&self) -> i32 {
+        (self.left + self.right).into()
     }
 }

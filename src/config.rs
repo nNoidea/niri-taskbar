@@ -14,7 +14,9 @@ pub struct Config {
     #[serde(default)]
     show_all_outputs: bool,
     #[serde(default)]
-    orientation: TaskbarOrientation
+    orientation: TaskbarOrientation,
+    #[serde(default)]
+    icon_size: Option<i32>,
 }
 
 #[derive(Debug, Copy, Clone, Deserialize)]
@@ -117,6 +119,10 @@ impl Config {
 
     pub fn orientation(&self) -> TaskbarOrientation {
         self.orientation
+    }
+
+    pub fn icon_size(&self) -> Option<i32> {
+        self.icon_size
     }
 }
 
