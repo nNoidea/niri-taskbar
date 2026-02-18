@@ -17,6 +17,24 @@ pub struct Config {
     orientation: TaskbarOrientation,
     #[serde(default)]
     icon_size: Option<i32>,
+    #[serde(default = "default_mouse_left", rename = "mouse-left")]
+    mouse_left: MouseAction,
+    #[serde(default = "default_mouse_middle", rename = "mouse-middle")]
+    mouse_middle: MouseAction,
+    #[serde(default = "default_mouse_right", rename = "mouse-right")]
+    mouse_right: MouseAction,
+}
+
+fn default_mouse_left() -> MouseAction {
+    MouseAction::Activate
+}
+
+fn default_mouse_middle() -> MouseAction {
+    MouseAction::None
+}
+
+fn default_mouse_right() -> MouseAction {
+    MouseAction::None
 }
 
 #[derive(Debug, Copy, Clone, Deserialize)]
@@ -124,6 +142,18 @@ impl Config {
     pub fn icon_size(&self) -> Option<i32> {
         self.icon_size
     }
+
+    pub fn mouse_left(&self) -> MouseAction {
+        self.mouse_left
+    }
+
+    pub fn mouse_middle(&self) -> MouseAction {
+        self.mouse_middle
+    }
+
+    pub fn mouse_right(&self) -> MouseAction {
+        self.mouse_right
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -138,4 +168,18 @@ where
     D: Deserializer<'de>,
 {
     Regex::new(&String::deserialize(de)?).map_err(serde::de::Error::custom)
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum MouseAction {
+    None,
+    Activate,
+    Close,
+}
+
+impl Default for MouseAction {
+    fn default() -> Self {
+        Self::None
+    }
 }

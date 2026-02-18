@@ -28,6 +28,13 @@ impl Niri {
         reply::typed!(Handled, reply)
     }
 
+    /// Requests that the given window ID should be closed.
+    #[tracing::instrument(level = "TRACE", err)]
+    pub fn close_window(&self, id: u64) -> Result<(), Error> {
+        let reply = request(Request::Action(Action::CloseWindow { id: Some(id) }))?;
+        reply::typed!(Handled, reply)
+    }
+
     /// Returns the current outputs.
     pub fn outputs(&self) -> Result<HashMap<String, Output>, Error> {
         let reply = request(Request::Outputs)?;

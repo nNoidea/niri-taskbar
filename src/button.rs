@@ -77,7 +77,7 @@ impl Button {
         };
 
         // Set up our event handlers. It's easier to do this with self already available.
-        button.connect_click_handler(window.id);
+        button.connect_button_handlers(window.id);
         button.connect_size_allocate(icon_path, icon_size);
 
         button
@@ -133,13 +133,32 @@ impl Button {
         &self.button
     }
 
-    fn connect_click_handler(&self, window_id: u64) {
+    fn connect_button_handlers(&self, window_id: u64) {
         let state = self.state.clone();
 
-        self.button.connect_clicked(move |_| {
-            if let Err(e) = state.niri().activate_window(window_id) {
-                tracing::warn!(%e, id = window_id, "error trying to activate window");
+        self.button.connect_button_release_event(move |_, event| {
+            let action = match event.button() {
+                1 => state.config().mouse_left(),
+                2 => state.config().mouse_middle(),
+                3 => state.config().mouse_right(),
+                _ => return gtk::glib::Propagation::Proceed,
+            };
+
+            match action {
+                crate::config::MouseAction::None => (),
+                crate::config::MouseAction::Activate => {
+                    if let Err(e) = state.niri().activate_window(window_id) {
+                        tracing::warn!(%e, id = window_id, "error trying to activate window");
+                    }
+                }
+                crate::config::MouseAction::Close => {
+                    if let Err(e) = state.niri().close_window(window_id) {
+                        tracing::warn!(%e, id = window_id, "error trying to close window");
+                    }
+                }
             }
+
+            gtk::glib::Propagation::Proceed
         });
     }
 
